@@ -2,7 +2,7 @@
 .vertx/
 
 ### Eclipse ###
-
+.idea
 .metadata
 bin/
 tmp/
@@ -10,11 +10,16 @@ tmp/
 *.bak
 *.swp
 *~.nib
+gradle/*
+gradlew
+.editorconfig
+gradlew.bat
+settings.gradle.kts
 local.properties
 .settings/
 .loadpath
 .recommenders
-
+build/
 # External tool builders
 .externalToolBuilders/
 

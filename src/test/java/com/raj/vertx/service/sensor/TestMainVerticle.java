@@ -1,4 +1,4 @@
-package com.raj.vertx.service.sensor_service;
+package com.raj.vertx.service.sensor;
 
 import io.vertx.core.Vertx;
 import io.vertx.junit5.VertxExtension;

@@ -17,7 +17,7 @@ repositories {
 val vertxVersion = "4.5.8"
 val junitJupiterVersion = "5.9.1"
 
-val mainVerticleName = "com.raj.vertx.service.sensor_service.SensorVerticle"
+val mainVerticleName = "com.raj.vertx.service.sensor.SensorVerticle"
 val launcherClassName = "io.vertx.core.Launcher"
 
 val watchForChange = "src/**/*"
@@ -30,6 +30,7 @@ application {
 dependencies {
   implementation(platform("io.vertx:vertx-stack-depchain:$vertxVersion"))
   implementation("io.vertx:vertx-core")
+  implementation("io.vertx:vertx-web:4.5.8")
   implementation("ch.qos.logback:logback-classic:1.4.12")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
