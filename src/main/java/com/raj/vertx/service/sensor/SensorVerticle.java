@@ -49,19 +49,24 @@ public class SensorVerticle extends AbstractVerticle {
 
     private void getData(RoutingContext context) {
         LOG.info("Process http request for {}", context.request().remoteAddress().toString());
+             context.response()
+               .putHeader("Content-Type", "application/json")
+               .setStatusCode(200)
+               .end(createTemperatureObj().encode());
+    }
+
+    private JsonObject createTemperatureObj() {
         JsonObject payload = new JsonObject();
         payload.put("uuid", uniqueId);
         payload.put("temperature", temperature);
         payload.put("timeStamp", System.currentTimeMillis());
-
-        context.response()
-               .putHeader("Content-Type", "application/json")
-               .setStatusCode(200)
-               .end(payload.encode());
+        return payload;
     }
 
     private void updateTemperature(Long aLong) {
         temperature = temperature + (random.nextGaussian() / 2.0);
         LOG.info("New temperature:{}", temperature);
+
+        vertx.eventBus().publish("temperature.updates", createTemperatureObj());
     }
 }
