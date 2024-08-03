@@ -1,28 +1,28 @@
 package com.raj.vertx.service.sensor;
 
 import java.time.OffsetDateTime;
-import java.time.OffsetTime;
+import java.util.Collections;
 import java.util.Random;
 import java.util.UUID;
 
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Promise;
 import io.vertx.core.Vertx;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.json.jackson.DatabindCodec;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.pgclient.PgBuilder;
 import io.vertx.pgclient.PgConnectOptions;
-import io.vertx.pgclient.PgPool;
-import io.vertx.pgclient.impl.PgPoolImpl;
-import io.vertx.sqlclient.Pool;
 import io.vertx.sqlclient.PoolOptions;
 import io.vertx.sqlclient.Row;
 import io.vertx.sqlclient.RowSet;
 import io.vertx.sqlclient.SqlClient;
 import io.vertx.sqlclient.Tuple;
+import io.vertx.sqlclient.templates.SqlTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +42,7 @@ public class SensorVerticle extends AbstractVerticle {
     public void start(Promise<Void> startPromise) throws Exception {
         LOG.info("Sensor Verticle started");
 
-        vertx.setPeriodic(2000, this::updateTemperature);
+        vertx.setPeriodic(30000, this::updateTemperature);
 
         sqlClient = createSqlClient(vertx);
 
@@ -50,7 +50,7 @@ public class SensorVerticle extends AbstractVerticle {
 
          //Creating HTTP Request handler using Router
         Router router = Router.router(vertx);
-        router.get("/temperatures/uuid").handler(this::getData);
+        router.get("/temperatures/uuid/:uuid").handler(this::getData);
         router.get("/temperatures").handler(this::getAllData);
 
 
@@ -68,10 +68,12 @@ public class SensorVerticle extends AbstractVerticle {
 
     private void recordTemperature(Message<JsonObject> msg) {
         JsonObject body = msg.body();
+        OffsetDateTime createdTime = OffsetDateTime.parse(body.getString("createdtime"));
         Tuple values = Tuple.of(body.getString("uuid"),
-                body.getString("createdTimeStamp"),
+                createdTime,
                 body.getDouble("temperature"));
-        sqlClient.preparedQuery(insertTemperatureEvent())
+
+        sqlClient.preparedQuery("INSERT INTO temperature_records VALUES($1, $2::timestamptz, $3)")
                 .execute(values)
                  .onComplete(ar -> {
                      if (ar.succeeded()) {
@@ -82,9 +84,20 @@ public class SensorVerticle extends AbstractVerticle {
                      }});
     }
 
-    static String insertTemperatureEvent() {
-        return "INSERT INTO temperature_records VALUES($1, $2::timestamptz, $3)";
+    //Using SqlTemplate need some more dependencies
+    private void recordTemperature() {
+         /* SqlTemplate.forUpdate(sqlClient, "INSERT INTO temperature_records VALUES(#{uuid}, #{createdtime}, #{temperature})")
+                   .mapFrom(TupleMapper.jsonObject())
+                   .execute(body)
+                   .onSuccess(ar -> {
+                               System.out.println("Temperature inserted/"+ ar.rowCount());
+                           }
+                   ).onFailure(fail -> {
+                      fail.printStackTrace();
+                      // System.out.println("Failure: " + fail.getCause().getMessage());
+                   });*/
     }
+
     private void getAllData(RoutingContext ctx) {
 
         LOG.info("Requesting all data from :{}", ctx.request().remoteAddress());
@@ -97,7 +110,7 @@ public class SensorVerticle extends AbstractVerticle {
                        jsonArray.add(new JsonObject()
                                .put("uuid", row.getString("uuid"))
                                .put("temperature", row.getDouble("temperature"))
-                               .put("timestamp", row.getTemporal("tstamp").toString())
+                               .put("createdtime", row.getTemporal("createdtime").toString())
                        );
                     }
                     ctx.response()
@@ -112,17 +125,47 @@ public class SensorVerticle extends AbstractVerticle {
 
     private void getData(RoutingContext context) {
         LOG.info("Process http request for {}", context.request().remoteAddress().toString());
-             context.response()
-               .putHeader("Content-Type", "application/json")
-               .setStatusCode(200)
-               .end(createTemperatureObj().encode());
+        String uuid = context.request().getParam("uuid");
+        //Added to support Java 8 date/time type `java.time.OffsetDateTime
+        DatabindCodec.mapper().registerModule(new JavaTimeModule());
+        SqlTemplate.forQuery(sqlClient, "select * from temperature_records where uuid=#{uuid}")
+                   /*.mapTo(row -> {
+                       Temperature temp = new Temperature();
+                       temp.setUuid(row.getString("uuid"));
+                       temp.setCreatedtime(row.getOffsetDateTime("createdtime"));
+                       temp.setTemperature(row.getDouble("temperature"));
+                       return temp;
+                   })*/
+
+                   .execute(Collections.singletonMap("uuid", uuid))
+                   .onSuccess(tempRowSet -> {
+                               LOG.info("Latest temperature returned for UUID:{}", uuid);
+                            JsonArray data = new JsonArray();
+                               for (Row row : tempRowSet) {
+                                   JsonObject jsonObject = new JsonObject();
+                                   jsonObject.put("uuid", row.getString("uuid"))
+                                             .put("temperature", row.getOffsetDateTime("createdtime"))
+                                             .put("createdtime", row.getDouble("temperature"));
+                                             data.add(jsonObject);
+                               }
+                               context.response().setStatusCode(200)
+                                      .putHeader("Content-Type", "application/json")
+
+                                      .end(new JsonObject().put("uuid", uuid)
+                                              .put("data", data).encode());
+                           }
+                   )
+                   .onFailure(err -> {
+                       LOG.error("Failed to retrieve latest temperature update for UUID {}/ {}", uuid, err);
+                       throw new RuntimeException("Unable to find the temperature for UUID:" + uuid);
+                   });
     }
 
     private JsonObject createTemperatureObj() {
         JsonObject payload = new JsonObject();
         payload.put("uuid", uniqueId);
         payload.put("temperature", temperature);
-        payload.put("createdTimeStamp", OffsetDateTime.now().toString());
+        payload.put("createdtime", OffsetDateTime.now().toString());
         return payload;
     }
 

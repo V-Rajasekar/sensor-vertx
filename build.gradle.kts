@@ -16,6 +16,7 @@ repositories {
 
 val vertxVersion = "4.5.8"
 val junitJupiterVersion = "5.9.1"
+val jacksonVersion="2.17.1"
 
 val mainVerticleName = "com.raj.vertx.service.sensor.SensorVerticle"
 val launcherClassName = "io.vertx.core.Launcher"
@@ -32,7 +33,15 @@ dependencies {
   implementation("io.vertx:vertx-core")
   implementation("io.vertx:vertx-web:4.5.8")
   implementation("io.vertx:vertx-pg-client:4.5.9")
+  implementation ("io.vertx:vertx-sql-client-templates:4.5.9")
   implementation("ch.qos.logback:logback-classic:1.4.12")
+  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion")
+
+  implementation ("com.fasterxml.jackson.core:jackson-core:$jacksonVersion")
+  implementation ("com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion")
+  implementation ("com.fasterxml.jackson.core:jackson-databind:$jacksonVersion")
+
+
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
 }
