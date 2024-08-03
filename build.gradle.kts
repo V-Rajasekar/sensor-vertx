@@ -31,6 +31,7 @@ dependencies {
   implementation(platform("io.vertx:vertx-stack-depchain:$vertxVersion"))
   implementation("io.vertx:vertx-core")
   implementation("io.vertx:vertx-web:4.5.8")
+  implementation("io.vertx:vertx-pg-client:4.5.9")
   implementation("ch.qos.logback:logback-classic:1.4.12")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
